@@ -1,0 +1,57 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentic-trader"
+version = "0.1.0"
+description = "PoC hierarchical multi-agent trading system: MARL execution + LLM R-Quants"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+dependencies = [
+    # Simulation / RL
+    "gymnasium>=0.29",
+    "numpy>=1.26",
+    "pandas>=2.2",
+    "stable-baselines3>=2.3",
+    "torch>=2.2",
+    "scipy>=1.13",
+    # LLM multi-agent
+    "pyautogen>=0.2.36",
+    "openai>=1.30",
+    # Utilities
+    "rich>=13.7",
+    "python-dotenv>=1.0",
+    "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+abides = [
+    # Install ABIDES-MARL separately from source:
+    #   git clone https://github.com/jpmorganchase/abides-jpmc-public
+    #   pip install -e abides-jpmc-public/abides-markets
+    #   pip install -e abides-jpmc-public/abides-gym
+]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "pytest-cov>=5.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["agentic_trader"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = false
+ignore_missing_imports = true

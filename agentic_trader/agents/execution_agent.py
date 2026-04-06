@@ -89,6 +89,22 @@ class ExecutionAgent:
         order = self._action_to_order(clipped_action)
         return clipped_action, order
 
+    def action_description(self, action: np.ndarray) -> str:
+        """Return a human-readable label for an action vector.
+
+        Useful for logging and dashboard display without having to decode
+        the raw float each time.
+
+        Examples: "BUY 3 units (signal=0.61)", "HOLD (signal=0.00)", "SELL 1 unit (signal=-0.22)"
+        """
+        a = float(np.clip(np.asarray(action, dtype=np.float32).flatten()[0], -1.0, 1.0))
+        size = round(abs(a) * self.local_limits.max_order_size)
+        if size == 0 or abs(a) < 1e-4:
+            return f"HOLD (signal={a:.2f})"
+        direction = "BUY" if a > 0 else "SELL"
+        unit_label = "unit" if size == 1 else "units"
+        return f"{direction} {size} {unit_label} (signal={a:.2f})"
+
     def update_inventory(self, delta: float) -> None:
         """Called by the Orchestrator after a fill to keep internal state in sync."""
         self._inventory += delta

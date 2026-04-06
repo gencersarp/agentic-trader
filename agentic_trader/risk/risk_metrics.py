@@ -29,6 +29,7 @@ class PerformanceStats:
     calmar_ratio: float = 0.0
     var_95: float = 0.0                # 1-period 95 % VaR (positive = loss)
     es_95: float = 0.0                 # Expected Shortfall at 95 %
+    tail_ratio: float = 0.0            # 95th pct return / |5th pct return|
     n_periods: int = 0
 
 
@@ -126,40 +127,40 @@ class RiskEngine:
     def estimate_var(self, portfolio: PortfolioState, hypothetical_order: dict) -> float:
         """Estimate 1-step VaR if a hypothetical order were to be executed.
 
-        Uses the existing pnl_history plus a simple forward-looking addition
-        based on position delta and recent volatility.
+        Uses parametric Gaussian VaR: recovers per-dollar price volatility
+        from the PnL history and scales to the post-trade notional exposure.
 
         Args:
             portfolio: current portfolio snapshot
             hypothetical_order: dict with keys 'side' (+1/-1) and 'size' (shares)
         """
-        history = list(portfolio.pnl_history)
-        if len(history) < 5:
-            # not enough history — fall back to notional-based estimate
-            size = hypothetical_order.get("size", 0)
-            side = hypothetical_order.get("side", 0)
-            new_inv = portfolio.inventory + side * size
-            # rough 1-std move on new inventory
-            recent_vol = 0.01 * portfolio.mid_price   # assume 1% 1-period move
-            return abs(new_inv) * recent_vol
-        # add a hypothetical delta P&L sample for the proposed position
-        arr = np.array(history, dtype=float)
-        vol = float(np.std(arr, ddof=1))
-        # expected worst-case shift
         size = hypothetical_order.get("size", 0)
-        new_notional = (abs(portfolio.inventory) + size) * portfolio.mid_price
-        # scale historical VaR by notional ratio
-        base_var = self.gaussian_var(history)
-        old_notional = portfolio.gross_notional if portfolio.gross_notional > 0 else 1.0
-        scaled_var = base_var * (new_notional / old_notional)
-        return float(scaled_var)
+        side = hypothetical_order.get("side", 0)
+        new_inv = portfolio.inventory + side * size
+        new_notional = abs(new_inv) * max(portfolio.mid_price, 0.01)
+        z = stats.norm.ppf(self.confidence)  # ~1.65 for 95%
+
+        history = list(portfolio.pnl_history)
+        if len(history) < 10:
+            # Not enough history — assume 1% per-step price volatility
+            return float(new_notional * 0.01 * z)
+
+        # Recover per-dollar volatility from PnL history.
+        # PnL_t ~ inventory_t * delta_price_t, so std(PnL) ~ avg_|notional| * price_vol.
+        arr = np.array(history, dtype=float)
+        pnl_vol = float(np.std(arr, ddof=1))
+        # Use current notional as the denominator (at least 1 share worth)
+        avg_notional = max(portfolio.gross_notional, portfolio.mid_price)
+        price_vol_frac = pnl_vol / avg_notional
+
+        return float(max(0.0, new_notional * price_vol_frac * z))
 
     # ------------------------------------------------------------------
     # Performance statistics
     # ------------------------------------------------------------------
 
     @staticmethod
-    def compute_stats(pnl_deltas: Sequence[float], periods_per_year: int = 252) -> PerformanceStats:
+    def compute_stats(pnl_deltas: Sequence[float], periods_per_year: int = 98_280) -> PerformanceStats:
         """Compute full performance statistics from a series of per-period P&L deltas."""
         if len(pnl_deltas) == 0:
             return PerformanceStats()
@@ -187,6 +188,10 @@ class RiskEngine:
         # Calmar
         calmar = (cumulative / max_dd) if max_dd > 0 else 0.0
 
+        p95 = float(np.percentile(arr, 95))
+        p05 = float(np.percentile(arr, 5))
+        tail_ratio = p95 / max(abs(p05), 1e-9)
+
         engine = RiskEngine()
         return PerformanceStats(
             total_return=cumulative,
@@ -196,6 +201,7 @@ class RiskEngine:
             calmar_ratio=float(calmar),
             var_95=engine.historical_var(arr),
             es_95=engine.expected_shortfall(arr),
+            tail_ratio=float(tail_ratio),
             n_periods=n,
         )
 

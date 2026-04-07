@@ -28,6 +28,14 @@ class EnvConfig:
     max_inventory: int = 1_000       # shares; used for action scaling and obs normalisation
     annual_vol: float = 0.20         # GBM volatility for synthetic price process
     annual_drift: float = 0.0        # GBM drift
+    regime_switching: bool = True    # enable 3-state regime-switching volatility
+
+    # Reward shaping configuration
+    reward_type: str = "pnl"         # "pnl", "risk_adjusted", "sharpe_inspired"
+    inv_penalty_lambda: float = 1e-3  # inventory penalty coefficient
+    drawdown_penalty_lambda: float = 5e-3  # penalty for exceeding drawdown threshold
+    drawdown_threshold: float = 5_000.0    # USD drawdown before penalty kicks in
+    var_penalty_lambda: float = 1e-3       # penalty on rolling VaR estimate
 
 
 # ---------------------------------------------------------------------------

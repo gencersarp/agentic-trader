@@ -59,9 +59,9 @@ class RegimeAgent:
 
     def __init__(
         self,
-        vol_high_threshold: float = 0.005,
-        vol_crisis_threshold: float = 0.015,
-        smoothing: float = 0.3,
+        vol_high_threshold: float = 0.010,
+        vol_crisis_threshold: float = 0.018,
+        smoothing: float = 0.4,
     ):
         self.vol_high_threshold = vol_high_threshold
         self.vol_crisis_threshold = vol_crisis_threshold
